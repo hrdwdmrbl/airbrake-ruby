@@ -66,6 +66,8 @@ module Airbrake
     end
 
     def truncate_string(str)
+      return str if str.frozen?
+
       fixed_str = replace_invalid_characters(str)
       return fixed_str if fixed_str.length <= @max_size
 

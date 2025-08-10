@@ -50,6 +50,7 @@ module Airbrake
     def initialize(exception, params = {})
       @config = Airbrake::Config.instance
       @truncator = Airbrake::Truncator.new(PAYLOAD_MAX_SIZE)
+      @message_truncator = Airbrake::Truncator.new(512)
 
       @payload = {
         errors: NestedException.new(exception).as_json,
@@ -80,6 +81,7 @@ module Airbrake
           return json if json && json.bytesize <= MAX_NOTICE_SIZE
         end
 
+        backtrace_cleaner
         break if truncate == 0
       end
     end
@@ -133,8 +135,21 @@ module Airbrake
         hostname: HOSTNAME,
 
         severity: DEFAULT_SEVERITY,
-        error_message: @truncator.truncate(exception.message),
+        error_message: @message_truncator.truncate(exception.message).freeze,
       }.merge(CONTEXT).delete_if { |_key, val| val.nil? || val.empty? }
+    end
+
+    APP_DIRS_PATTERN = /\A(?:\.\/)?(?:app|config|lib|test|\(\w*\))/
+
+    def backtrace_cleaner
+      return if @backtrace_cleaned
+
+      @backtrace_cleaned = true
+      @payload[:errors].each do |error|
+        error[:backtrace] = error[:backtrace].select do |line|
+          line[:file].match?(APP_DIRS_PATTERN)
+        end
+      end
     end
 
     def truncate
