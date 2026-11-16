@@ -49,6 +49,24 @@ RSpec.describe Airbrake::Notice do
     end
 
     context "truncation" do
+      it "preserves application frames when truncating a filtered notice" do
+        exception = StandardError.new("Couldn't find ShopifyChannel")
+        exception.set_backtrace([
+          "/rails/app/models/shopify_channel.rb:93:in `create!'",
+          "/rails/vendor/bundle/active_record/relation.rb:232:in `create_or_find_by!'",
+        ])
+        notice = described_class.new(exception, webhook: 'x' * 100_000)
+        Airbrake::Filters::RootDirectoryFilter.new('/rails').call(notice)
+
+        json = notice.to_json
+        backtrace = JSON.parse(json).fetch('errors').first.fetch('backtrace')
+
+        expect(json.bytesize).to be <= described_class::MAX_NOTICE_SIZE
+        expect(backtrace.map { |frame| frame.fetch('file') }).to eq([
+          '/PROJECT_ROOT/app/models/shopify_channel.rb',
+        ])
+      end
+
       it "truncates context/error_message" do
         msg = 'message-' * 64000
         notice = described_class.new(StandardError.new(msg))

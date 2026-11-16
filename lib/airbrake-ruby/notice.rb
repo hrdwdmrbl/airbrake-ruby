@@ -139,7 +139,7 @@ module Airbrake
       }.merge(CONTEXT).delete_if { |_key, val| val.nil? || val.empty? }
     end
 
-    APP_DIRS_PATTERN = /\A(?:\.\/)?(?:app|config|lib|test|\(\w*\))/
+    APP_DIRS_PATTERN = %r{\A(?:\./|/PROJECT_ROOT/)?(?:app|config|lib|test|\(\w*\))}
 
     def backtrace_cleaner
       return if @backtrace_cleaned
